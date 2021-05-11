@@ -1,21 +1,25 @@
-import pandas as pd 
+import pandas as pd
+import datetime as dt  
 from xml.dom import minidom
 import ntpath
 import sys
 
 #DAILY/MONTHLY RUN  
 FX_RUN_VERSION="M"
-DATE="20210506"
+DATE="2021-07-31"
+
+utilDir="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/"
+processDir="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/"
 
 #I/O names
-currencyList="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/currency_list.txt"
-glTranslationCodes="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/gl_translationcode.txt"
-fileList="C:/Users/patelsm/Desktop/fx_rates/inbound/filelist.txt"
-dailyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/APWeeklyRates.csv"
-monthlyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/GLExchangeRate.csv"
-quarterlyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/GLTranslationRateInterface.csv"
-err_CAD="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/missingCAD.txt"
-err_USD="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/missingUSD.txt"
+currencyList=utilDir+"currency_list.txt"
+glTranslationCodes=utilDir+"gl_translationcode.txt"
+fileList=processDir+"filelist.txt"
+dailyOutput=processDir+"APWeeklyRates.csv"
+monthlyOutput=processDir+"GLExchangeRate.csv"
+quarterlyOutput=processDir+"GLTranslationRateInterface.csv"
+err_CAD=processDir+"missingCAD.txt"
+err_USD=processDir+"missingUSD.txt"
 
 #CURRENCY LIST
 currency_chk_cdn={}
@@ -163,7 +167,11 @@ def missingRates():
     print(missingList_usd.keys()) 
     print(missingList_cdn.keys()) 
 
-def quarterCheck():    
-    return (True)
+def quarterCheck(curDate):    
+    quarter_end = pd.to_datetime(dt.datetime.today() + pd.tseries.offsets.QuarterEnd(startingMonth=1)).date()
+    if(str(quarter_end)==curDate):
+        return(True)
+    else:
+        return(False)
 
 main()
