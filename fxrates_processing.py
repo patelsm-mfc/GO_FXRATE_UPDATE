@@ -4,13 +4,22 @@ import ntpath
 import sys
 
 #DAILY/MONTHLY RUN  
-FX_RUN_VERSION="D"
+FX_RUN_VERSION="M"
 DATE="20210506"
 
+#I/O names
+currencyList="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/currency_list.txt"
+glTranslationCodes="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/gl_translationcode.txt"
+fileList="C:/Users/patelsm/Desktop/fx_rates/inbound/filelist.txt"
+dailyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/APWeeklyRates.csv"
+monthlyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/GLExchangeRate.csv"
+quarterlyOutput="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/GLTranslationRateInterface.csv"
+err_CAD="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/missingCAD.txt"
+err_USD="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/missingUSD.txt"
 
 #CURRENCY LIST
 currency_chk_cdn={}
-f_currlist = open("C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/currency_list.txt", "r")
+f_currlist = open(currencyList, "r")
 currlist_content = f_currlist.read()
 content_list = currlist_content.split(",")
 
@@ -22,7 +31,7 @@ currency_chk_usd=currency_chk_cdn.copy()
 
 #GL TRANSLATIONCODES
 gl_translationcodes=[]
-f_gltrancodes = open("C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/gl_translationcode.txt", "r")
+f_gltrancodes = open(glTranslationCodes, "r")
 gltranscode_content = f_gltrancodes.read()
 content_list = gltranscode_content.split(",")
 for line in content_list:    
@@ -33,7 +42,7 @@ def main():
     appended_data = []
 
     #read the list of inputfiles
-    with open('C:/Users/patelsm/Desktop/fx_rates/inbound/filelist.txt') as f:
+    with open(fileList) as f:
         lines = f.read().splitlines()
     
     #process each file and append to final dataframe
@@ -72,9 +81,9 @@ def process(file_name):
         if (BPL_value == "SPX"):
             currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
             price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
-            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)
-            quarterly_rate=1
+            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
             #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+            quarterly_rate=2
             triangulate_flag=1                       
             temp_list = ["USD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
             list.append(temp_list)
@@ -82,9 +91,9 @@ def process(file_name):
         if(BPL_value == "XFX"):            
             currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
             price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
-            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)
-            quarterly_rate=1
+            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
             #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+            quarterly_rate=4
             triangulate_flag=0                       
             temp_list = ["CAD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
             list.append(temp_list)            
@@ -111,10 +120,10 @@ def dailymonthly(df,runtype):
     final_output['GLExchangeRateInterface']=final_output.index+1
     if(runtype == 'D'):
         final_output['CurrencyTable']='APCB'
-        filename="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/daily.txt"
+        f_name=dailyOutput
     else:
         final_output['CurrencyTable']='MFC'
-        filename="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/monthly.txt"
+        f_name=monthlyOutput
 
     #temporary fix to remove null rows
     nan_value = float("NaN")
@@ -122,7 +131,7 @@ def dailymonthly(df,runtype):
     final_output.dropna(subset = ["from_currency"], inplace=True)   
 
     final_output= final_output[['FinanceEnterpriseGroup','GLExchangeRateInterface','CurrencyTable','from_currency','to_currency','date','daily_fx']]
-    final_output.to_csv(filename,index=False)
+    final_output.to_csv(f_name,index=False)
 
 def quarterlyExtract(df,glcodes):
     final_output = pd.DataFrame([])
@@ -132,19 +141,20 @@ def quarterlyExtract(df,glcodes):
         temp_df2 = pd.DataFrame()
         temp_df2['to_currency']=temp_df1['from_currency']    
         temp_df2['from_currency']=temp_df1['to_currency']    
-        temp_df2['date']=temp_df1['date']    
-        temp_df2['3m_average_fx']=1                    
+        temp_df2['date']=temp_df1['date']        
+        temp_df2['3m_average_fx']=df['3m_average_fx'].apply(lambda x: 1/x)                             
         temp_df1['GeneralLedgerTranslationCode']=glcode
         temp_df2['GeneralLedgerTranslationCode']=glcode                      
         temp_df1 = pd.concat([temp_df1,temp_df2])
         final_output=pd.concat([final_output,temp_df1])  
-
-
+    
+    final_output.drop( final_output[ final_output['from_currency'] == final_output['to_currency'] ].index, inplace=True)
+    #final_output.drop( final_output[ final_output['triangulate_flag'] == 0 ].index, inplace=True)
     final_output['FinanceEnterpriseGroup']='MFC'
     final_output['GLTranslationRateInterface']=final_output.index+1 
     #print(df)
-    final_output= final_output[['FinanceEnterpriseGroup','GLTranslationRateInterface','GeneralLedgerTranslationCode','from_currency','to_currency','date','3m_average_fx']]
-    final_output.to_csv("C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/quarterly.txt",index=False)
+    final_output= final_output[['FinanceEnterpriseGroup','GLTranslationRateInterface','GeneralLedgerTranslationCode','from_currency','to_currency','date','3m_average_fx','triangulate_flag']]
+    final_output.to_csv(quarterlyOutput,index=False)
 
 
 def missingRates():
