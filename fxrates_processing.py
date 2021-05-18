@@ -22,6 +22,7 @@ err_CAD=processDir+"missingCAD.txt"
 err_USD=processDir+"missingUSD.txt"
 
 #CURRENCY LIST
+#
 currency_chk_cdn={}
 f_currlist = open(currencyList, "r")
 currlist_content = f_currlist.read()
@@ -54,112 +55,98 @@ def main():
         appended_data.append(process(lines[x]))
 
     appended_data = pd.concat(appended_data, ignore_index = True)
+    
     appended_data.columns = ['from_currency','to_currency','date','daily_fx','3m_average_fx','triangulate_flag']
 
+    new_df = currencyTriangualate(appended_data)     
+    
     #CREATE DAILY EXTRACT
-    dailymonthly(appended_data[['from_currency','to_currency','date','daily_fx','triangulate_flag']],"D")
+    dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],"D")
+     
 
     #CREATE MONTHLY/QUARTERY EXTRACT
     if(FX_RUN_VERSION=="M"):
-        dailymonthly(appended_data[['from_currency','to_currency','date','daily_fx','triangulate_flag']],FX_RUN_VERSION)
-    if(True):
-        print("this is quarterly") 
-        quarterlyExtract(appended_data[['from_currency','to_currency','date','3m_average_fx','triangulate_flag']],gl_translationcodes)        
+        dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],FX_RUN_VERSION)
+    if(True):        
+        quarterlyExtract(new_df[['from_currency','to_currency','date','daily_fx','3m_average_fx']],gl_translationcodes)        
            
     
     #Missing Rates
     missingRates()
 
 
-def process(file_name):
+def process(file_name):  
+    
     tree = minidom.parse(file_name)
     spot_rate_type="BPL_CLASSIFIER_II"
-    quaterly_rate_type="ML_3M_AVG_PRIOR_RATE"
-    seqnum=0
+    quaterly_rate_type="ML_3M_AVG_PRIOR_RATE"    
     items = tree.getElementsByTagName('Price')
     
     list = []
-    for item in items:       
-        BPL_type = item.getElementsByTagName(spot_rate_type)
-        BPL_value = BPL_type[0].firstChild.nodeValue
-        if (BPL_value == "SPX"):
-            currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
-            price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
-            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-            #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
-            quarterly_rate=2
-            triangulate_flag=1                       
-            temp_list = ["USD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
-            list.append(temp_list)
-            currency_chk_usd[currency]=True 
-        if(BPL_value == "XFX"):            
-            currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
-            price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
-            to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-            #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
-            quarterly_rate=4
-            triangulate_flag=0                       
-            temp_list = ["CAD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
-            list.append(temp_list)            
-            currency_chk_cdn[currency]=True
-    df = pd.DataFrame(list)
-    
-    return(df)          
+    try:
+        for item in items:       
+            BPL_type = item.getElementsByTagName(spot_rate_type)
+            BPL_value = BPL_type[0].firstChild.nodeValue
+            if (BPL_value == "SPX"):
+                currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
+                price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
+                to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
+                #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+                quarterly_rate=2
+                triangulate_flag=1                       
+                temp_list = ["USD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
+                list.append(temp_list)
+                currency_chk_usd[currency]=True 
+            if(BPL_value == "XFX"):            
+                currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
+                price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
+                to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
+                #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+                quarterly_rate=4
+                triangulate_flag=0                       
+                temp_list = ["CAD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
+                list.append(temp_list)            
+                currency_chk_cdn[currency]=True
+        df = pd.DataFrame(list)
+        return(df)
 
-def dailymonthly(df,runtype):
-   
-    #triangulate all to usd and all to cad
-    temp_df = pd.DataFrame()
-    temp_df['to_currency']=df['from_currency']    
-    temp_df['from_currency']=df['to_currency']    
-    temp_df['date']=df['date']    
-    temp_df['daily_fx']=df['daily_fx'].apply(lambda x: 1/x)     
+    except IndexError as e:
+        print(e)
+
+def dailymonthly(df,runtype): 
     
-    
-    temp_df.columns.name = None
-    final_output=df.append(temp_df,ignore_index=True)
-    #drop cad to all, data not needed
-    final_output.drop( final_output[ final_output['triangulate_flag'] == 0 ].index, inplace=True)    
-    final_output['FinanceEnterpriseGroup']='MFC'
-    final_output['GLExchangeRateInterface']=final_output.index+1
+    df['FinanceEnterpriseGroup']='MFC'
+    df['GLExchangeRateInterface']=df.index+1
     if(runtype == 'D'):
-        final_output['CurrencyTable']='APCB'
+        df['CurrencyTable']='APCB'
         f_name=dailyOutput
     else:
-        final_output['CurrencyTable']='MFC'
+        df['CurrencyTable']='MFC'
         f_name=monthlyOutput
 
-    #temporary fix to remove null rows
-    nan_value = float("NaN")
-    final_output.replace("", nan_value, inplace=True)
-    final_output.dropna(subset = ["from_currency"], inplace=True)   
-
-    final_output= final_output[['FinanceEnterpriseGroup','GLExchangeRateInterface','CurrencyTable','from_currency','to_currency','date','daily_fx']]
-    final_output.to_csv(f_name,index=False)
+    df= df[['FinanceEnterpriseGroup','GLExchangeRateInterface','CurrencyTable','from_currency','to_currency','date','daily_fx']]
+    df.to_csv(f_name,index=False)
 
 def quarterlyExtract(df,glcodes):
-    final_output = pd.DataFrame([])
-
-    for glcode in glcodes:
-        temp_df1=df
+    final_output = pd.DataFrame([])    
+    for glcode in glcodes:        
         temp_df2 = pd.DataFrame()
-        temp_df2['to_currency']=temp_df1['from_currency']    
-        temp_df2['from_currency']=temp_df1['to_currency']    
-        temp_df2['date']=temp_df1['date']        
-        temp_df2['3m_average_fx']=df['3m_average_fx'].apply(lambda x: 1/x)                             
-        temp_df1['GeneralLedgerTranslationCode']=glcode
-        temp_df2['GeneralLedgerTranslationCode']=glcode                      
-        temp_df1 = pd.concat([temp_df1,temp_df2])
-        final_output=pd.concat([final_output,temp_df1])  
+        if(glcode.startswith('IS')):                          
+            temp_df2['3m_average_fx']=df['daily_fx']            
+        else:            
+            temp_df2['3m_average_fx']=df['3m_average_fx']            
+        temp_df2['from_currency']=df['from_currency']
+        temp_df2['to_currency']=df['to_currency']
+        temp_df2['date']=df['date']                               
+        temp_df2['GeneralLedgerTranslationCode']=glcode                          
+        
+        final_output=pd.concat([final_output,temp_df2])          
     
     final_output.drop( final_output[ final_output['from_currency'] == final_output['to_currency'] ].index, inplace=True)
-    #final_output.drop( final_output[ final_output['triangulate_flag'] == 0 ].index, inplace=True)
     final_output['FinanceEnterpriseGroup']='MFC'
     final_output['GLTranslationRateInterface']=final_output.index+1 
-    #print(df)
-    final_output= final_output[['FinanceEnterpriseGroup','GLTranslationRateInterface','GeneralLedgerTranslationCode','from_currency','to_currency','date','3m_average_fx','triangulate_flag']]
+    final_output= final_output[['FinanceEnterpriseGroup','GLTranslationRateInterface','GeneralLedgerTranslationCode','from_currency','to_currency','date','3m_average_fx']]
     final_output.to_csv(quarterlyOutput,index=False)
-
 
 def missingRates():
     missingList_usd = dict(filter(lambda elem: elem[1] == False, currency_chk_usd.items()))
@@ -173,5 +160,17 @@ def quarterCheck(curDate):
         return(True)
     else:
         return(False)
+
+def currencyTriangualate(df):
+    temp_df = pd.DataFrame()
+    temp_df['to_currency']=df['from_currency']    
+    temp_df['from_currency']=df['to_currency']    
+    temp_df['date']=df['date']    
+    temp_df['daily_fx']=df['daily_fx'].apply(lambda x: 1/x)
+    temp_df['3m_average_fx']=df['3m_average_fx'].apply(lambda x: 1/x)
+    final_output=df.append(temp_df,ignore_index=True)
+    final_output.drop( final_output[ final_output['triangulate_flag'] == 0 ].index, inplace=True) 
+    
+    return(final_output)
 
 main()
