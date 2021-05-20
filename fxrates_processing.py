@@ -1,12 +1,13 @@
 import pandas as pd
 import datetime as dt  
+from datetime import datetime
 from xml.dom import minidom
 import ntpath
 import sys
 
 #DAILY/MONTHLY RUN  
 FX_RUN_VERSION="M"
-DATE="2021-07-31"
+strDate="2021-06-30"
 
 utilDir="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/"
 processDir="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/output/"
@@ -21,8 +22,14 @@ quarterlyOutput=processDir+"GLTranslationRateInterface.csv"
 err_CAD=processDir+"missingCAD.txt"
 err_USD=processDir+"missingUSD.txt"
 
+#CREATE DATE OBJ
+date_obj = datetime.strptime(strDate, "%Y-%m-%d").date()
+first_day_of_month = date_obj.replace(day=1)
+curr_month=date_obj.month
+quarterEnd = [3, 6, 9, 12]
+
+
 #CURRENCY LIST
-#
 currency_chk_cdn={}
 f_currlist = open(currencyList, "r")
 currlist_content = f_currlist.read()
@@ -67,8 +74,8 @@ def main():
     #CREATE MONTHLY/QUARTERY EXTRACT
     if(FX_RUN_VERSION=="M"):
         dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],FX_RUN_VERSION)
-    if(True):        
-        quarterlyExtract(new_df[['from_currency','to_currency','date','daily_fx','3m_average_fx']],gl_translationcodes)        
+        if(curr_month in quarterEnd):        
+            quarterlyExtract(new_df[['from_currency','to_currency','date','daily_fx','3m_average_fx']],gl_translationcodes)        
            
     
     #Missing Rates
@@ -122,19 +129,21 @@ def dailymonthly(df,runtype):
         f_name=dailyOutput
     else:
         df['CurrencyTable']='MFC'
+        df['date']=first_day_of_month
         f_name=monthlyOutput
 
     df= df[['FinanceEnterpriseGroup','GLExchangeRateInterface','CurrencyTable','from_currency','to_currency','date','daily_fx']]
     df.to_csv(f_name,index=False)
 
 def quarterlyExtract(df,glcodes):
-    final_output = pd.DataFrame([])    
+    final_output = pd.DataFrame([])
+    quarterly_avg = ['IS', 'BI']    
     for glcode in glcodes:        
         temp_df2 = pd.DataFrame()
-        if(glcode.startswith('IS')):                          
-            temp_df2['3m_average_fx']=df['daily_fx']            
-        else:            
+        if(glcode in quarterly_avg):                          
             temp_df2['3m_average_fx']=df['3m_average_fx']            
+        else:            
+            temp_df2['3m_average_fx']=df['daily_fx']            
         temp_df2['from_currency']=df['from_currency']
         temp_df2['to_currency']=df['to_currency']
         temp_df2['date']=df['date']                               
