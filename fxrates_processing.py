@@ -62,31 +62,32 @@ def main():
         appended_data.append(process(lines[x]))
 
     appended_data = pd.concat(appended_data, ignore_index = True)
-    
-    appended_data.columns = ['from_currency','to_currency','date','daily_fx','3m_average_fx','triangulate_flag']
 
-    new_df = currencyTriangualate(appended_data)     
-    
-    #CREATE DAILY EXTRACT
-    dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],"D")
-     
-
-    #CREATE MONTHLY/QUARTERY EXTRACT
-    if(FX_RUN_VERSION=="M"):
-        dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],FX_RUN_VERSION)
-        if(curr_month in quarterEnd):        
-            quarterlyExtract(new_df[['from_currency','to_currency','date','daily_fx','3m_average_fx']],gl_translationcodes)        
-           
-    
-    #Missing Rates
+    #Check for missing Rates
     missingRates()
 
+    if(True):    
+        appended_data.columns = ['from_currency','to_currency','date','daily_fx','3m_average_fx','triangulate_flag']
 
+        new_df = currencyTriangualate(appended_data)     
+        
+        #CREATE DAILY EXTRACT
+        dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],"D")
+        
+
+        #CREATE MONTHLY/QUARTERY EXTRACT
+        if(FX_RUN_VERSION=="M"):
+            dailymonthly(new_df[['from_currency','to_currency','date','daily_fx']],FX_RUN_VERSION)
+            if(curr_month in quarterEnd):        
+                quarterlyExtract(new_df[['from_currency','to_currency','date','daily_fx','3m_average_fx']],gl_translationcodes) 
+    else:
+        print("Missing Currencies")        
+   
 def process(file_name):  
     
     tree = minidom.parse(file_name)
     spot_rate_type="BPL_CLASSIFIER_II"
-    quaterly_rate_type="ML_3M_AVG_PRIOR_RATE"    
+    quaterly_rate_type="ML_QUARTER_AVG_RATE"    
     items = tree.getElementsByTagName('Price')
     
     list = []
@@ -98,8 +99,7 @@ def process(file_name):
                 currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
                 price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
                 to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-                #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
-                quarterly_rate=2
+                quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)                
                 triangulate_flag=1                       
                 temp_list = ["USD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
                 list.append(temp_list)
@@ -108,8 +108,7 @@ def process(file_name):
                 currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
                 price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
                 to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-                #quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
-                quarterly_rate=4
+                quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)                
                 triangulate_flag=0                       
                 temp_list = ["CAD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
                 list.append(temp_list)            
@@ -160,16 +159,16 @@ def quarterlyExtract(df,glcodes):
 def missingRates():
     missingList_usd = dict(filter(lambda elem: elem[1] == False, currency_chk_usd.items()))
     missingList_cdn = dict(filter(lambda elem: elem[1] == False, currency_chk_cdn.items()))
-    print(missingList_usd.keys()) 
-    print(missingList_cdn.keys()) 
-
-def quarterCheck(curDate):    
-    quarter_end = pd.to_datetime(dt.datetime.today() + pd.tseries.offsets.QuarterEnd(startingMonth=1)).date()
-    if(str(quarter_end)==curDate):
-        return(True)
+    if not missingList_usd and not missingList_cdn:
+        
+        return True
     else:
-        return(False)
-
+        print("USD Rates missing")
+        print(missingList_usd)
+        print("CAD Rates missing")
+        print(missingList_cdn)
+        return False
+ 
 def currencyTriangualate(df):
     temp_df = pd.DataFrame()
     temp_df['to_currency']=df['from_currency']    
