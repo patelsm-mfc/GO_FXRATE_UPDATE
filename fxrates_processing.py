@@ -6,7 +6,7 @@ import ntpath
 import sys
 
 #DAILY/MONTHLY RUN  
-FX_RUN_VERSION="M"
+FX_RUN_VERSION="D"
 strDate="2021-06-30"
 
 utilDir="C:/Users/patelsm/Desktop/fx_rates/GO_FXRATE_UPDATE/"
@@ -99,7 +99,10 @@ def process(file_name):
                 currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
                 price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
                 to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-                quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)                
+                if(FX_RUN_VERSION=="M"):
+                    quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+                else:
+                    quarterly_rate=1               
                 triangulate_flag=1                       
                 temp_list = ["USD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
                 list.append(temp_list)
@@ -107,8 +110,11 @@ def process(file_name):
             if(BPL_value == "XFX"):            
                 currency = item.getElementsByTagName("ML_CROSS_CURRENCY")[0].firstChild.nodeValue
                 price_date = item.getElementsByTagName("ML_PRICE_DATE")[0].firstChild.nodeValue
-                to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)            
-                quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)                
+                to_rate = float(item.getElementsByTagName("ML_RATE")[0].firstChild.nodeValue)
+                if(FX_RUN_VERSION=="M"):
+                    quarterly_rate=float(item.getElementsByTagName(quaterly_rate_type)[0].firstChild.nodeValue)
+                else:
+                    quarterly_rate=1                               
                 triangulate_flag=0                       
                 temp_list = ["CAD",currency, price_date, to_rate,quarterly_rate,triangulate_flag]
                 list.append(temp_list)            
